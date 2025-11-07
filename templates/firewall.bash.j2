@@ -25,9 +25,9 @@ done
 fi
 
 # Set the default rules.
-iptables -P INPUT {{ input_policy }}
-iptables -P FORWARD {{ forward_policy }}
-iptables -P OUTPUT {{ output_policy }}
+iptables -P INPUT {{ firewall_input_policy }}
+iptables -P FORWARD {{ firewall_forward_policy }}
+iptables -P OUTPUT {{ firewall_output_policy }}
 
 {% if firewall_flush_rules_and_chains %}
 # Remove all rules and chains.
