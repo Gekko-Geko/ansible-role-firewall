@@ -7,12 +7,13 @@ firewall_input_policy: "DROP"
 firewall_forward_policy: "DROP"
 firewall_output_policy: "ACCEPT"
 
+firewall_ipv6_input_policy: "DROP"
+firewall_ipv6_forward_policy: "DROP"
+firewall_ipv6_output_policy: "DROP"
+
 firewall_template: firewall.bash.j2
 firewall_allowed_tcp_ports:
   - "22"
-  - "25"
-  - "80"
-  - "443"
 firewall_allowed_udp_ports: []
 firewall_forwarded_tcp_ports: []
 firewall_forwarded_udp_ports: []

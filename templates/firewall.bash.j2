@@ -27,6 +27,10 @@ iptables -P INPUT {{ firewall_input_policy }}
 iptables -P FORWARD {{ firewall_forward_policy }}
 iptables -P OUTPUT {{ firewall_output_policy }}
 
+ip6tables -P INPUT {{ firewall_ipv6_input_policy }}
+ip6tables -P FORWARD {{ firewall_ipv6_forward_policy }}
+ip6tables -P OUTPUT {{ firewall_ipv6_output_policy }}
+
 {% if firewall_flush_rules_and_chains %}
 # Remove all rules and chains.
 iptables -t nat -F
