@@ -1,19 +1,8 @@
 #!/bin/bash
 # iptables firewall.
 #
-# This file should be located at /etc/firewall.bash, and is meant to work with
-# the `geerlingguy.firewall` Ansible role.
-#
-# Common port reference:
-#   22: SSH
-#   25: SMTP
-#   80: HTTP
-#   123: NTP
-#   443: HTTPS
-#   2222: SSH alternate
-#   8080: HTTP alternate
-#
 # @author Jeff Geerling
+# @modified Gekko Geko
 
 # No spoofing.
 if [ -e /proc/sys/net/ipv4/conf/all/rp_filter ]; then
@@ -55,10 +44,20 @@ iptables -t nat -I PREROUTING -p udp --dport {{ forwarded_port.src }} -j REDIREC
 iptables -t nat -I OUTPUT -p udp -o lo --dport {{ forwarded_port.src }} -j REDIRECT --to-port {{ forwarded_port.dest }}
 {% endfor %}
 
+# Open SSH.
+iptables -A INPUT -i {{ firewall_iface }} -p tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+
+# Enable outgoing HTTPS/HTTP and DNS
+iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --dport 443 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o {{ firewall_iface }} -p udp --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+
 # Open ports.
 {# Add a rule for each open port #}
 {% for port in firewall_allowed_tcp_ports %}
-iptables -A INPUT -p tcp -m tcp --dport {{ port }} -j ACCEPT
+iptables -A INPUT -i {{ firewall_iface }} -p tcp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --sport {{ port }} -m state --state ESTABLISHED -j ACCEPT
 {% endfor %}
 {% for port in firewall_allowed_udp_ports %}
 iptables -A INPUT -p udp -m udp --dport {{ port }} -j ACCEPT
@@ -84,11 +83,13 @@ iptables -A INPUT -p icmp --icmp-type echo-request -j LOG --log-level 7 --log-pr
 
 {% if firewall_log_dropped_packets %}
 # Log other incoming requests (all of which are dropped) at 15/minute max.
-iptables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall: "
+iptables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall IN: "
+iptables -A OUTPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall OUT: "
 {% endif %}
 
 # Drop all other traffic.
 iptables -A INPUT -j DROP
+iptables -A OUTPUT -j DROP
 
 {% if firewall_enable_ipv6 %}
 # Configure IPv6 if ip6tables is present.

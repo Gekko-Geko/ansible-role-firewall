@@ -5,13 +5,14 @@ firewall_enabled_at_boot: true
 firewall_flush_rules_and_chains: true
 firewall_input_policy: "DROP"
 firewall_forward_policy: "DROP"
-firewall_output_policy: "ACCEPT"
+firewall_output_policy: "DROP"
 
 firewall_ipv6_input_policy: "DROP"
 firewall_ipv6_forward_policy: "DROP"
 firewall_ipv6_output_policy: "DROP"
 
 firewall_template: firewall.bash.j2
+firewall_iface: "eth0"
 firewall_allowed_tcp_ports:
   - "22"
 firewall_allowed_udp_ports: []
