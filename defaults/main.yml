@@ -13,9 +13,10 @@ firewall_ipv6_output_policy: "DROP"
 
 firewall_template: firewall.bash.j2
 firewall_iface: "eth0"
-firewall_allowed_tcp_ports:
-  - "22"
-firewall_allowed_udp_ports: []
+firewall_allowed_tcp_ports_in: []
+firewall_allowed_tcp_ports_out: []
+firewall_allowed_udp_ports_in: []
+firewall_allowed_udp_ports_out: []
 firewall_forwarded_tcp_ports: []
 firewall_forwarded_udp_ports: []
 firewall_additional_rules: []

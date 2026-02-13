@@ -33,6 +33,9 @@ iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -s 127.0.0.0/8 -j DROP
 iptables -A OUTPUT -o lo -j ACCEPT
 
+# Allow established connections:
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
 # Forwarded ports.
 {# Add a rule for each forwarded port #}
 {% for forwarded_port in firewall_forwarded_tcp_ports %}
@@ -53,27 +56,36 @@ iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --dport 443 -m state --state N
 iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT
 iptables -A OUTPUT -o {{ firewall_iface }} -p udp --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
 
+# Allow NTP traffic for time synchronization.
+iptables -A INPUT -i {{ firewall_iface }} -p udp --sport 123 -j ACCEPT
+iptables -A OUTPUT -o {{ firewall_iface }} -p udp --dport 123 -j ACCEPT
+
 # Open ports.
 {# Add a rule for each open port #}
-{% for port in firewall_allowed_tcp_ports %}
+# TCP ports.
+{% for port in firewall_allowed_tcp_ports_in %}
 iptables -A INPUT -i {{ firewall_iface }} -p tcp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
 iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --sport {{ port }} -m state --state ESTABLISHED -j ACCEPT
 {% endfor %}
-{% for port in firewall_allowed_udp_ports %}
-iptables -A INPUT -p udp -m udp --dport {{ port }} -j ACCEPT
+
+{% for port in firewall_allowed_tcp_ports_out %}
+iptables -A OUTPUT -o {{ firewall_iface }} -p tcp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
 {% endfor %}
 
-# Allow NTP traffic for time synchronization.
-iptables -A OUTPUT -p udp --dport 123 -j ACCEPT
-iptables -A INPUT -p udp --sport 123 -j ACCEPT
+# UDP ports
+{% for port in firewall_allowed_udp_ports_in %}
+iptables -A INPUT -i {{ firewall_iface }} -p udp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o {{ firewall_iface }} -p udp --sport {{ port }} -m state --state ESTABLISHED -j ACCEPT
+{% endfor %}
+
+{% for port in firewall_allowed_udp_ports_out %}
+iptables -A OUTPUT -o {{ firewall_iface }} -p udp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
+{% endfor %}
 
 # Additional custom rules.
 {% for rule in firewall_additional_rules %}
 {{ rule }}
 {% endfor %}
-
-# Allow established connections:
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Log EVERYTHING (ONLY for Debug).
 # iptables -A INPUT -j LOG
@@ -106,11 +118,24 @@ if [ -x "$(which ip6tables 2>/dev/null)" ]; then
 
 	# Open ports.
 	{# Add a rule for each open port #}
-	{% for port in firewall_allowed_tcp_ports %}
-	ip6tables -A INPUT -p tcp -m tcp --dport {{ port }} -j ACCEPT
+	# TCP ports.
+	{% for port in firewall_allowed_tcp_ports_in %}
+	ip6tables -A INPUT -i {{ firewall_iface }} -p tcp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
+	ip6tables -A OUTPUT -o {{ firewall_iface }} -p tcp --sport {{ port }} -m state --state ESTABLISHED -j ACCEPT
 	{% endfor %}
-	{% for port in firewall_allowed_udp_ports %}
-	ip6tables -A INPUT -p udp -m udp --dport {{ port }} -j ACCEPT
+
+	{% for port in firewall_allowed_tcp_ports_out %}
+	ip6tables -A OUTPUT -o {{ firewall_iface }} -p tcp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
+	{% endfor %}
+
+	# UDP ports
+	{% for port in firewall_allowed_udp_ports_in %}
+	ip6tables -A INPUT -i {{ firewall_iface }} -p udp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
+	ip6tables -A OUTPUT -o {{ firewall_iface }} -p udp --sport {{ port }} -m state --state ESTABLISHED -j ACCEPT
+	{% endfor %}
+
+	{% for port in firewall_allowed_udp_ports_out %}
+	ip6tables -A OUTPUT -o {{ firewall_iface }} -p udp --dport {{ port }} -m state --state NEW,ESTABLISHED -j ACCEPT
 	{% endfor %}
 
 	# Accept ICMPv6 message types necessary for SLAAC plus echo request/reply
@@ -122,8 +147,8 @@ if [ -x "$(which ip6tables 2>/dev/null)" ]; then
 	ip6tables -A INPUT -p ipv6-icmp --icmpv6-type 136 -j ACCEPT # Neighbor Advertisement
 
 	# Allow NTP traffic for time synchronization.
-	ip6tables -A OUTPUT -p udp --dport 123 -j ACCEPT
-	ip6tables -A INPUT -p udp --sport 123 -j ACCEPT
+	ip6tables -A INPUT -i {{ firewall_iface }} -p udp --sport 123 -j ACCEPT
+	ip6tables -A OUTPUT -o {{ firewall_iface }} -p udp --dport 123 -j ACCEPT
 
 	# Additional custom rules.
 	{% for rule in firewall_ip6_additional_rules %}
@@ -144,5 +169,11 @@ if [ -x "$(which ip6tables 2>/dev/null)" ]; then
 	# Drop all other traffic.
 	ip6tables -A INPUT -j DROP
 
+fi
+{% else %}
+if [ -x "$(which ip6tables 2>/dev/null)" ]; then
+	ip6tables -P INPUT -j DROP
+	ip6tables -P FORWARD -j DROP
+	ip6tables -P OUTPUT -j DROP
 fi
 {% endif %}
